@@ -18,53 +18,51 @@ const StyledContainer = styled(Container)`
   ${spacing}
 `;
 
+// can use state machine to control states
 export default function Home() {
   const [list, setList] = useState([
-    { name: 'Amy', processed: [] },
-    { name: 'Bob', processed: [] },
-    { name: 'Cory', processed: [] },
-    { name: 'Dora', processed: [] },
+    { name: 'Amy', processing: null, processed: [] },
+    { name: 'Bob', processing: null, processed: [] },
+    { name: 'Cory', processing: null, processed: [] },
+    { name: 'Dora', processing: null, processed: [] },
   ]);
-  const [processingList, setProcessingList] = useState([
-    null,
-    null,
-    null,
-    null,
-  ]);
-  const [count, setCount] = useState(1);
+  const [count, setCount] = useState(0);
   const [waitings, setWaitings] = useState(null);
 
+  // find people that not in processing
   const findEmpty = () => {
-    for (let i = 0; i < processingList.length; i++) {
-      if (!processingList[i]) {
+    for (let i = 0; i < list.length; i++) {
+      if (!list[i].processing) {
         return i;
       }
     }
+    return null;
   };
 
+  // random between 500 - 1500
+  // normally random will put into utility file
   const randomTime = () => {
-    // random between 500 - 1500
     return Math.floor(Math.random() * 1001) + 500;
   };
 
   const clearProcessing = async (nextIndex) => {
-    // const nextList = list;
-    console.log('list0', list);
     const nextProcessedArr = list[nextIndex].processed;
     nextProcessedArr.push(count);
-    await setProcessingList(
-      processingList.map((item, i) => (i === nextIndex ? null : item))
-    );
-    await setList(
-      list.map((item, i) =>
-        i === nextIndex ? { ...item, processed: nextProcessedArr } : item
+    await setList((prev) =>
+      prev.map((item, i) =>
+        i === nextIndex
+          ? { ...item, processing: null, processed: nextProcessedArr }
+          : item
       )
     );
   };
 
-  const addProcessing = async (nextIndex, prevCount) => {
-    await setProcessingList(
-      processingList.map((item, i) => (i === nextIndex ? prevCount : item))
+  const waitingToProcessing = (nextIndex, waitings) => {
+    console.log('add', waitings, 'at index', nextIndex);
+    setList((prev) =>
+      prev.map((item, i) =>
+        i === nextIndex ? { ...item, processing: waitings } : item
+      )
     );
   };
 
@@ -72,17 +70,74 @@ export default function Home() {
     return new Promise((res) => setTimeout(res, time));
   };
 
+  const countToWaitings = async (nextWaitings) => {
+    console.log(
+      'next waitings',
+      count + 1 > (nextWaitings || 0) ? (nextWaitings || 0) + 1 : null,
+      count,
+      waitings
+    );
+    await setWaitings(
+      count + 1 > (nextWaitings || 0) ? (nextWaitings || 0) + 1 : null
+    );
+  };
+
   const triggerNext = async () => {
-    const nextIndex = findEmpty();
-    const prevCount = count;
+    // const nextIndex = findEmpty();
+    // const prevCount = count;
     await setCount(count + 1);
 
-    if (Number.isInteger(nextIndex) && !waitings) {
-      await addProcessing(nextIndex, prevCount);
-      await delay(randomTime());
-      clearProcessing(nextIndex);
+    // if (Number.isInteger(nextIndex) && !waitings) {
+    //   await addProcessing(nextIndex, prevCount);
+    //   await delay(randomTime());
+    //   await clearProcessing(nextIndex);
+    // }
+
+    if (!waitings) {
+      await setWaitings(count + 1);
     }
   };
+
+  useEffect(() => {
+    const trigger = async () => {
+      const nextIndex = findEmpty();
+      console.log('nextIndex00', nextIndex);
+      if (Number.isInteger(nextIndex)) {
+        await countToWaitings(waitings);
+        await waitingToProcessing(nextIndex, waitings);
+        console.log('nextIndex', nextIndex);
+        console.log('waitings', waitings);
+        console.log('count', count);
+        console.log(
+          'set waitings to',
+          count + 1 > (waitings || 0) ? (waitings || 0) + 1 : null
+        );
+        await delay(randomTime());
+        await clearProcessing(nextIndex);
+        if (count + 1 > (waitings || 0)) {
+          console.log('count to waitings');
+          await countToWaitings(waitings + 1);
+        }
+        console.log('===========================');
+      }
+      // if (!Number.isInteger(nextIndex) && waitings) {
+      //   // console.log('cw', count, waitings);
+      //   // if (count > (waitings || 0)) {
+      //   console.log('count to waitings');
+      //   await countToWaitings(waitings + 1);
+      //   // await
+      //   // }
+      // }
+    };
+
+    console.log('waitings0', waitings);
+    if (waitings) {
+      trigger();
+    }
+    // if (!waitings && count > (waitings || 0)) {
+    //   setWaitings(count);
+    // }
+  }, [waitings, count]);
 
   return (
     <StyledContainer p={2} component="span">
@@ -96,13 +151,13 @@ export default function Home() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {list.map((item, i) => (
+            {list.map((item) => (
               <TableRow key={item.name}>
                 <TableCell component="th" scope="row">
                   {item.name}
                 </TableCell>
                 <TableCell>
-                  {processingList[i] ? processingList[i] : 'idle'}
+                  {item.processing ? item.processing : 'idle'}
                 </TableCell>
                 <TableCell>
                   {item.processed.length ? item.processed.join(',') : 'N/A'}
@@ -115,7 +170,7 @@ export default function Home() {
       <Box display="flex" mt={2} justifyContent="space-between">
         <Box>{`waitings: ${waitings}`}</Box>
         <Button variant="contained" color="primary" onClick={triggerNext}>
-          {`Next ${count}`}
+          {`Next ${count + 1}`}
         </Button>
       </Box>
     </StyledContainer>
